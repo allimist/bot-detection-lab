@@ -1,0 +1,23 @@
+# Project name fixes container/volume names regardless of the folder name.
+name: bot-detection-lab
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5178:5178"   # http
+      - "5443:5443"   # https with JA4 TLS fingerprinting (self-signed unless TLS_CERT/TLS_KEY are set)
+    environment:
+      # API_TOKEN: change-me   # protects the dashboard API and /api/check/:id
+      LOG_LEVEL: info
+    volumes:
+      - data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5178/api/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+
+volumes:
+  data:

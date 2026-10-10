@@ -1,0 +1,34 @@
+{
+  "name": "bot-detection-lab",
+  "private": true,
+  "type": "module",
+  "description": "Is this visitor a real customer or a bot? Browser fingerprint, proxy/VPN/Tor checks, automation detection and an explainable score.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "build": "npm run build -w apps/web",
+    "start": "npm run build && npm run start -w apps/api",
+    "data": "tsx scripts/update-data.ts",
+    "test": "tsx --test packages/scoring/test/*.test.ts apps/api/test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "bots": "tsx scripts/bots/run.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/selenium-webdriver": "^4.35.7",
+    "concurrently": "^10.0.6",
+    "playwright": "^1.64.0",
+    "puppeteer-core": "^25.13.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "selenium-webdriver": "^4.51.0",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
