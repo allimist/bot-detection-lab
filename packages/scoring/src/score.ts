@@ -1,4 +1,5 @@
-import type { Finding, Flag, ScoreResult, Signals, Verdict } from './types.ts';
+import type { Finding, Flag, IpIntel, ScoreResult, Signals, Verdict } from './types.ts';
+import { geoChecks } from './geo.ts';
 import { RULES, type Ctx } from './rules.ts';
 import { parseUa } from './ua.ts';
 
@@ -10,13 +11,18 @@ export function verdictFor(score: number): Verdict {
   return 'human';
 }
 
+/** The IP the network rules judge: the HTTP IP, or the WebRTC IP when HTTP came from a private network. */
+export function judgedIp(s: Signals): IpIntel {
+  return s.server.ip.isPrivate && s.server.webrtcIp ? s.server.webrtcIp : s.server.ip;
+}
+
 const ORDER = { fail: 0, warn: 1, info: 2, pass: 3 } as const;
 
 /** Pure function: same signals in, same result out. */
 export function score(s: Signals): ScoreResult {
   const headerUa = parseUa(s.server.headers.userAgent);
   const ua = s.client ? parseUa(s.client.userAgent) : headerUa;
-  const net = s.server.ip.isPrivate && s.server.webrtcIp ? s.server.webrtcIp : s.server.ip;
+  const net = judgedIp(s);
   const desktop = !ua.mobile && !s.client?.uaHints?.mobile;
   const ctx: Ctx = { s, ua, headerUa, net, desktop };
 
@@ -30,5 +36,5 @@ export function score(s: Signals): ScoreResult {
 
   const total = Math.min(100, findings.reduce((n, f) => n + f.points, 0));
   const flags = [...new Set(findings.flatMap((f) => f.flags ?? []))].sort() as Flag[];
-  return { score: total, verdict: verdictFor(total), flags, findings };
+  return { score: total, verdict: verdictFor(total), flags, findings, geo: geoChecks(s, net) };
 }

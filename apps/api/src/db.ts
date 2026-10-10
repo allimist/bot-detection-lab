@@ -2,7 +2,7 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { CheckResponse, ClientSignals, ScoreResult, Signals, VelocitySignals, Verdict } from '@bdl/scoring';
+import { geoChecks, judgedIp, type CheckResponse, type ClientSignals, type ScoreResult, type Signals, type VelocitySignals, type Verdict } from '@bdl/scoring';
 
 export interface VisitRow {
   id: string;
@@ -24,7 +24,8 @@ export interface VisitRow {
   findings: string; // JSON Finding[]
 }
 
-export type VisitSummary = Omit<VisitRow, 'signals' | 'findings' | 'flags'> & { flags: string[] };
+// geoMismatches: labels of the red "browser vs IP location" rows, for the dashboard marker.
+export type VisitSummary = Omit<VisitRow, 'signals' | 'findings' | 'flags'> & { flags: string[]; geoMismatches: string[] };
 
 // Components whose rarity the "Check me" page shows ("your canvas is shared by 3 of 120 devices").
 export function rarityComponents(c: ClientSignals): Record<string, string> {
@@ -139,9 +140,15 @@ export class Store {
     if (opts.q) { where.push('(ip LIKE ? OR fingerprint LIKE ? OR user_agent LIKE ? OR as_org LIKE ? OR site LIKE ?)'); args.push(...Array(5).fill(`%${opts.q}%`)); }
     const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = Number((this.db.prepare(`SELECT COUNT(*) n FROM visits ${w}`).get(...args) as { n: number }).n);
-    const rows = this.db.prepare(`SELECT id, created_at, source, site, ip, webrtc_ip, fingerprint, user_agent, country, asn, as_org, ja4, score, verdict, flags
-      FROM visits ${w} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...args, opts.limit, opts.offset) as unknown as (VisitSummary & { flags: string })[];
-    return { rows: rows.map((r) => ({ ...r, flags: JSON.parse(r.flags) as string[] })), total };
+    const rows = this.db.prepare(`SELECT id, created_at, source, site, ip, webrtc_ip, fingerprint, user_agent, country, asn, as_org, ja4, score, verdict, flags, signals
+      FROM visits ${w} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...args, opts.limit, opts.offset) as unknown as (Omit<VisitSummary, 'flags' | 'geoMismatches'> & { flags: string; signals: string })[];
+    return {
+      rows: rows.map(({ signals, ...r }) => {
+        const s = JSON.parse(signals) as Signals;
+        return { ...r, flags: JSON.parse(r.flags) as string[], geoMismatches: geoChecks(s, judgedIp(s)).filter((g) => g.match === false).map((g) => g.label) };
+      }),
+      total,
+    };
   }
 
   stats() {

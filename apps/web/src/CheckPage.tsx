@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BotCheck } from '@bdl/collector';
 import type { CheckResponse, IpIntel } from '@bdl/scoring';
-import { Flags, FindingsByCategory, Gauge, VerdictChip } from './ui.tsx';
+import { Flags, FindingsByCategory, Gauge, GeoTable, VerdictChip } from './ui.tsx';
 
 declare global {
   interface Window {
@@ -86,6 +86,8 @@ export function CheckPage() {
           <Flags flags={result.flags} />
         </div>
       </section>
+
+      <GeoTable geo={result.geo} />
 
       {showHttps && (
         <div className="banner">

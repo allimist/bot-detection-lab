@@ -3,8 +3,10 @@ import type { ClientSignals, IpIntel, ServerSignals, Signals } from '../src/inde
 export const CHROME_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
 
+export const NOW = Date.UTC(2026, 9, 10, 12, 0, 0);
+
 export const homeIp = (over: Partial<IpIntel> = {}): IpIntel => ({
-  ip: '84.229.10.20', isPrivate: false, country: 'IL', city: 'Tel Aviv', timezone: null,
+  ip: '84.229.10.20', isPrivate: false, country: 'IL', city: 'Tel Aviv', timezone: 'Asia/Jerusalem',
   asn: 1680, asOrg: 'Cellcom', datacenter: false, vpnRange: false, tor: false, ...over,
 });
 
@@ -29,6 +31,8 @@ export function chromeClient(over: Partial<ClientSignals> = {}): ClientSignals {
     webrtc: { supported: true, publicIps: ['84.229.10.20'], localIps: [] },
     behavior: null,
     collectMs: 120,
+    clientTime: NOW,
+    locale: 'en-US',
     ...over,
   };
 }
@@ -45,6 +49,7 @@ export function chromeServer(over: Partial<ServerSignals> = {}): ServerSignals {
     tls: { ja4: 't13d1516h2_8daaf6152771_d8a2da3f94cd', alpn: 'h2', ciphers: 15, extensions: 16, grease: true, cipherHash: '8daaf6152771' },
     velocity: { ipsForFingerprint24h: 1, fingerprintsForIp1h: 1, visitsForFingerprint10m: 1 },
     tzCountry: 'IL',
+    receivedAt: NOW + 150,
     ...over,
   };
 }
@@ -53,7 +58,7 @@ export const human = (): Signals => ({ client: chromeClient(), server: chromeSer
 
 function tzOffset(tz: string): number {
   const name = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
-    .formatToParts(new Date()).find((p) => p.type === 'timeZoneName')!.value;
+    .formatToParts(new Date(NOW)).find((p) => p.type === 'timeZoneName')!.value;
   const m = /GMT([+-])(\d{2}):(\d{2})/.exec(name);
   if (!m) return 0;
   const minutes = Number(m[2]) * 60 + Number(m[3]);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { score, parseUa, tzOffsetNow, type Signals } from '../src/index.ts';
-import { chromeClient, chromeServer, homeIp, human } from './fixtures.ts';
+import { NOW, chromeClient, chromeServer, homeIp, human } from './fixtures.ts';
 
 const ids = (s: Signals) => score(s).findings.filter((f) => f.points > 0).map((f) => f.id);
 
@@ -49,7 +49,7 @@ test('stealth plugin: fake Client Hints, old-style GPU string, 800x600 screen', 
 });
 
 test('VPN user: datacenter IP, VPN range, timezone from another country, WebRTC leak', () => {
-  const vpn = homeIp({ ip: '185.1.2.3', country: 'NL', city: 'Amsterdam', asn: 9009, asOrg: 'M247', datacenter: true, vpnRange: true });
+  const vpn = homeIp({ ip: '185.1.2.3', country: 'NL', city: 'Amsterdam', timezone: 'Europe/Amsterdam', asn: 9009, asOrg: 'M247', datacenter: true, vpnRange: true });
   const s = chromeServer({ ip: vpn, webrtcIp: homeIp() });
   const r = score({ client: chromeClient(), server: s });
   assert.deepEqual(new Set(ids({ client: chromeClient(), server: s })), new Set(['net.datacenter', 'net.vpn', 'net.webrtc', 'net.timezone']));
@@ -153,4 +153,66 @@ test('tzOffsetNow matches Date for the local zone', () => {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   assert.equal(tzOffsetNow(tz), new Date().getTimezoneOffset());
   assert.equal(tzOffsetNow('UTC'), 0);
+});
+
+// ---------------------------------------------------------------- browser vs IP location (display only)
+
+const geo = (s: Signals) => Object.fromEntries(score(s).geo.map((g) => [g.id, g.match]));
+
+test('geo: a normal visitor matches on every row', () => {
+  assert.deepEqual(geo(human()), { tz: true, offset: true, 'tz-country': true, clock: true, 'lang-country': true, 'accept-language': true, locale: true });
+});
+
+test('geo: Israeli browser on a Dutch VPN is red on timezone, time, country, language and WebRTC', () => {
+  const vpn = homeIp({ ip: '185.1.2.3', country: 'NL', city: 'Amsterdam', timezone: 'Europe/Amsterdam' });
+  const s: Signals = { client: chromeClient(), server: chromeServer({ ip: vpn, webrtcIp: homeIp() }) };
+  const g = geo(s);
+  for (const id of ['tz', 'offset', 'tz-country', 'lang-country', 'webrtc-country']) assert.equal(g[id], false, id);
+  assert.equal(g['accept-language'], true);
+  const offset = score(s).geo.find((r) => r.id === 'offset')!;
+  assert.match(offset.note, /1 h ahead/); // Jerusalem UTC+3 vs Amsterdam UTC+2 in October
+});
+
+test('geo: rows add no points', () => {
+  const vpn = homeIp({ country: 'US', city: 'Ashburn', timezone: 'America/New_York' });
+  const s: Signals = { client: chromeClient({ locale: 'ja-JP', clientTime: NOW - 600_000 }), server: chromeServer({ ip: vpn, tzCountry: 'IL' }) };
+  s.server.headers.acceptLanguage = 'ru-RU,ru;q=0.9';
+  const g = geo(s);
+  assert.equal(g.clock, false);
+  assert.equal(g.locale, false);
+  assert.equal(g['accept-language'], false);
+  // Only the existing scored rule (net.timezone +15) counts; the extra red rows don't.
+  assert.equal(score(s).score, 15);
+});
+
+test('geo: same offset under another zone name is not red', () => {
+  const s: Signals = { client: chromeClient(), server: chromeServer({ ip: homeIp({ country: 'DE', timezone: 'Europe/Berlin' }), tzCountry: 'NL' }) };
+  s.client!.fingerprint.timezone = 'Europe/Amsterdam';
+  s.client!.fingerprint.timezoneOffset = -120;
+  const g = geo(s);
+  assert.equal(g.tz, true);
+  assert.equal(g.offset, true);
+  assert.equal(g['tz-country'], false);
+});
+
+test('geo: private IP without WebRTC and old visits cannot be compared', () => {
+  const s: Signals = { client: chromeClient({ clientTime: null }), server: chromeServer({ ip: homeIp({ ip: '192.168.1.5', isPrivate: true, country: null, timezone: null }) }) };
+  const g = geo(s);
+  assert.equal(g.tz, null);
+  assert.equal(g.offset, null);
+  assert.equal(g.clock, null);
+  assert.equal(g['lang-country'], null);
+  assert.deepEqual(score({ client: null, server: chromeServer() }).geo, []);
+});
+
+test('geo: an English-only browser fits any country, another foreign language does not', () => {
+  const at = (languages: string[], country: string) => {
+    const s: Signals = { client: chromeClient(), server: chromeServer({ ip: homeIp({ country }) }) };
+    s.client!.fingerprint.languages = languages;
+    return geo(s)['lang-country'];
+  };
+  assert.equal(at(['en-GB', 'en-US', 'en'], 'IL'), true);
+  assert.equal(at(['ru-RU', 'en'], 'BR'), false);
+  assert.equal(at(['he', 'en'], 'US'), true);
+  assert.equal(at(['pt-BR'], 'BR'), true);
 });

@@ -80,6 +80,35 @@ export function isPrivateIp(ip: string): boolean {
   return l === '::1' || l === '::' || l.startsWith('fc') || l.startsWith('fd') || l.startsWith('fe80:');
 }
 
+export interface Zone {
+  tz: string;
+  lat: number;
+  lon: number;
+}
+
+/** zone.tab coordinates: "+4230+00131" or "-334200+1510600" (±DDMM[SS]±DDDMM[SS]). */
+export function parseZoneCoord(s: string): { lat: number; lon: number } | null {
+  const m = /^([+-])(\d{2})(\d{2})(\d{2})?([+-])(\d{3})(\d{2})(\d{2})?$/.exec(s);
+  if (!m) return null;
+  const deg = (sign: string, d: string, mm: string, ss = '0') => (sign === '-' ? -1 : 1) * (Number(d) + Number(mm) / 60 + Number(ss) / 3600);
+  return { lat: deg(m[1]!, m[2]!, m[3]!, m[4]), lon: deg(m[5]!, m[6]!, m[7]!, m[8]) };
+}
+
+/** The zone whose reference city is closest to a point. Good enough to tell New York from Los Angeles. */
+export function nearestZone(zones: Zone[], lat: number | undefined, lon: number | undefined): string | null {
+  if (zones.length === 0) return null;
+  if (zones.length === 1 || lat === undefined || lon === undefined) return zones[0]!.tz;
+  const cos = Math.cos((lat * Math.PI) / 180);
+  let best = zones[0]!;
+  let bestD = Infinity;
+  for (const z of zones) {
+    const dLon = Math.abs(z.lon - lon) % 360;
+    const d = (Math.min(dLon, 360 - dLon) * cos) ** 2 + (z.lat - lat) ** 2;
+    if (d < bestD) [best, bestD] = [z, d];
+  }
+  return best.tz;
+}
+
 export interface DatasetStatus {
   city: boolean;
   asn: boolean;
@@ -98,6 +127,7 @@ export class IpIntelService {
   private datacenterAsns = new Set<number>();
   private tor = new Set<string>();
   private tzCountries = new Map<string, string>();
+  private zonesByCountry = new Map<string, Zone[]>();
 
   constructor(private dir: string) {}
 
@@ -113,8 +143,11 @@ export class IpIntelService {
     this.datacenterAsns = new Set(lines('datacenter-asn.txt').map((l) => /^AS(\d+)/i.exec(l.trim())?.[1]).filter(Boolean).map(Number));
     this.tor = new Set(lines('tor-exits.txt').map((l) => l.trim()).filter((l) => isIP(l)));
     for (const l of lines('zone.tab')) {
-      const [cc, , tz] = l.split('\t');
-      if (cc && tz && !cc.startsWith('#')) this.tzCountries.set(tz, cc);
+      const [cc, coord, tz] = l.split('\t');
+      if (!cc || !tz || cc.startsWith('#')) continue;
+      this.tzCountries.set(tz, cc);
+      const at = parseZoneCoord(coord ?? '');
+      if (at) this.zonesByCountry.set(cc, [...(this.zonesByCountry.get(cc) ?? []), { tz, ...at }]);
     }
     for (const l of lines('tz-backward')) {
       const m = /^Link\s+(\S+)\s+(\S+)/.exec(l);
@@ -148,11 +181,15 @@ export class IpIntelService {
     const geo = this.city?.get(ip);
     const as = this.asn?.get(ip);
     const asn = as?.autonomous_system_number ?? null;
+    const country = geo?.country?.iso_code ?? null;
+    // DB-IP Lite has no time_zone: take the nearest tzdb zone of the IP's country instead.
+    const timezone = geo?.location?.time_zone
+      ?? (country ? nearestZone(this.zonesByCountry.get(country) ?? [], geo?.location?.latitude, geo?.location?.longitude) : null);
     return {
       ...base,
-      country: geo?.country?.iso_code ?? null,
+      country,
       city: geo?.city?.names?.en ?? null,
-      timezone: geo?.location?.time_zone ?? null,
+      timezone,
       asn,
       asOrg: as?.autonomous_system_organization ?? null,
       datacenter: (asn !== null && this.datacenterAsns.has(asn)) || !!this.datacenter?.has(ip),

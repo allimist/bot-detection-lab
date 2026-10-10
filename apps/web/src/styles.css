@@ -143,6 +143,16 @@ tr.click:hover td { background: var(--panel-2); }
 .truncate { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
 
+table.geo td { vertical-align: middle; }
+table.geo .label { font-weight: 600; }
+table.geo .note { color: var(--muted); font-size: 13px; margin-top: 2px; }
+table.geo td.verdict { font-weight: 700; text-align: center; white-space: nowrap; }
+table.geo tr.match td.verdict { color: var(--pass); }
+table.geo tr.unknown td { color: var(--muted); }
+table.geo tr.mismatch td { background: var(--fail-bg); color: var(--fail); }
+table.geo tr.mismatch .label, table.geo tr.mismatch td.verdict { color: var(--fail); }
+table.geo tr.mismatch .note { color: var(--fail); opacity: 0.85; }
+
 .bar { height: 8px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
 .bar > span { display: block; height: 100%; background: var(--accent); }
 .rarity { display: grid; grid-template-columns: 110px 1fr 120px; gap: 4px 12px; align-items: center; font-size: 14px; }

@@ -4,7 +4,7 @@ import { isIP } from 'node:net';
 import Fastify, { type FastifyRequest, type FastifyServerFactory } from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
-import { fingerprintId, score, type CheckResponse, type ClientSignals, type ServerSignals, type Signals, type TlsSignals } from '@bdl/scoring';
+import { fingerprintId, geoChecks, judgedIp, score, type CheckResponse, type ClientSignals, type ServerSignals, type Signals, type TlsSignals } from '@bdl/scoring';
 import { collectorBundle } from './bundle.ts';
 import { Store, type VisitRow } from './db.ts';
 import { headerSignals } from './headers.ts';
@@ -62,6 +62,7 @@ export async function buildApp(o: AppOptions) {
       tls: o.tlsStore.get(connKey(req.raw.socket)) ?? null,
       velocity: null,
       tzCountry: o.intel.tzCountry(client?.fingerprint.timezone),
+      receivedAt: Date.now(),
     };
   }
 
@@ -74,7 +75,7 @@ export async function buildApp(o: AppOptions) {
       ip: signals.server.ip,
       webrtcIp: signals.server.webrtcIp,
       tls: signals.server.tls,
-      result: { score: row.score, verdict: row.verdict, flags: JSON.parse(row.flags), findings: JSON.parse(row.findings) },
+      result: { score: row.score, verdict: row.verdict, flags: JSON.parse(row.flags), findings: JSON.parse(row.findings), geo: geoChecks(signals, judgedIp(signals)) },
       ...(withRarity && signals.client ? { rarity: o.store.rarity(signals.client) } : {}),
     };
   }

@@ -3,6 +3,7 @@ import { automation } from './automation.ts';
 import { BehaviorTracker } from './behavior.ts';
 import { fingerprint, uaHints } from './fingerprint.ts';
 import { lies } from './lies.ts';
+import { attempt } from './util.ts';
 import { webrtc } from './webrtc.ts';
 
 export { BehaviorTracker } from './behavior.ts';
@@ -29,6 +30,8 @@ export async function collect(opts: CollectOptions = {}): Promise<ClientSignals>
     webrtc: await rtc,
     behavior: opts.tracker?.summary() ?? null,
     collectMs: Math.round(performance.now() - t0),
+    clientTime: Date.now(),
+    locale: attempt(() => Intl.DateTimeFormat().resolvedOptions().locale, ''),
   };
 }
 
@@ -52,6 +55,7 @@ export class BotCheck {
 
   async run(): Promise<CheckResponse> {
     const signals = await collect({ stun: this.opts.stun, tracker: this.tracker });
+    signals.clientTime = Date.now();
     const res = await fetch(this.url('/api/collect'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

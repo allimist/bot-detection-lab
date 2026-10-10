@@ -17,6 +17,9 @@
 - 🎭 whether something is **lying**: patched native functions, an iframe or Web Worker that disagrees with the page, fake Client Hints, a User-Agent that doesn't match the JS engine
 - 🔐 the **JA4 TLS fingerprint**, read from the raw ClientHello in plain Node. A Python script with a copied Chrome User-Agent still shakes hands like Python.
 - 🖱️ **behaviour**: synthetic events, robot-straight mouse paths, metronome typing
+- 🗺️ **browser vs IP location**: timezone, local time, clock, languages, Accept-Language and locale, compared with where the IP is. Mismatches are shown in red.
+
+![Browser vs IP location: a New York timezone and Russian browser behind a London IP](docs/geo.png)
 
 Then it adds everything up into a **bot risk score from 0 to 100** and a verdict: `human`, `suspicious` or `bot`.
 

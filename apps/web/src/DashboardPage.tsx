@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CheckResponse, Signals, Verdict } from '@bdl/scoring';
-import { FLAG_LABEL, Flags, FindingsByCategory, VerdictChip, shortUa, timeAgo } from './ui.tsx';
+import { FLAG_LABEL, Flags, FindingsByCategory, GeoTable, VerdictChip, shortUa, timeAgo } from './ui.tsx';
 
 interface VisitSummary {
   id: string;
@@ -18,6 +18,7 @@ interface VisitSummary {
   score: number;
   verdict: Verdict;
   flags: string[];
+  geoMismatches?: string[]; // missing from servers older than the geo checks
 }
 
 interface Stats {
@@ -179,7 +180,10 @@ export function DashboardPage() {
                   <td className="small" title={v.user_agent ?? ''}>{shortUa(v.user_agent)}</td>
                   <td className="mono small">{v.fingerprint?.slice(0, 10) ?? '—'}</td>
                   <td className="small muted">{v.source}{v.site ? ` · ${v.site}` : ''}</td>
-                  <td><Flags flags={v.flags} /></td>
+                  <td>
+                    <Flags flags={v.flags} />
+                    {!!v.geoMismatches?.length && <span className="chip fail" title={`Browser vs IP location: ${v.geoMismatches.join(', ')}`}>⚑ geo {v.geoMismatches.length}</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -241,6 +245,7 @@ export function DashboardPage() {
               <dt>Fingerprint</dt><dd className="mono">{open.fingerprintId ?? '—'}</dd>
               <dt>JA4</dt><dd className="mono">{open.tls?.ja4 ?? '—'}</dd>
             </dl>
+            <GeoTable geo={open.result.geo} />
             <FindingsByCategory findings={open.result.findings} />
             <details className="panel">
               <summary>All signals</summary>

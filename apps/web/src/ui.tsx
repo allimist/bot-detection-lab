@@ -1,4 +1,4 @@
-import type { Category, Finding, Flag, Status, Verdict } from '@bdl/scoring';
+import type { Category, Finding, Flag, GeoCheck, Status, Verdict } from '@bdl/scoring';
 
 export const STATUS_ICON: Record<Status, string> = { pass: '✅', info: 'ℹ️', warn: '⚠️', fail: '❌' };
 
@@ -71,6 +71,39 @@ export function FindingList({ findings }: { findings: Finding[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** "Browser vs IP location": red rows where the browser does not fit where its IP is. */
+export function GeoTable({ geo }: { geo: GeoCheck[] | undefined }) {
+  if (!geo?.length) return null;
+  const bad = geo.filter((g) => g.match === false).length;
+  return (
+    <section className="panel">
+      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+        <h2 style={{ margin: 0 }}>Browser vs IP location</h2>
+        <span className={`chip ${bad ? 'fail' : 'pass'}`}>{bad ? `${bad} mismatch${bad > 1 ? 'es' : ''}` : 'all consistent'}</span>
+      </div>
+      <p className="muted small" style={{ marginBottom: 10 }}>Does the browser's timezone, clock and language fit where its IP comes from? Shown for information. Not counted in the score yet.</p>
+      <div className="table-wrap">
+        <table className="geo">
+          <thead><tr><th>Check</th><th>Browser</th><th>IP location / other side</th><th aria-label="result" /></tr></thead>
+          <tbody>
+            {geo.map((g) => (
+              <tr key={g.id} className={g.match === false ? 'mismatch' : g.match ? 'match' : 'unknown'} title={g.note}>
+                <td>
+                  <div className="label">{g.label}</div>
+                  <div className="note">{g.note}</div>
+                </td>
+                <td className="mono small">{g.browser}</td>
+                <td className="mono small">{g.location}</td>
+                <td className="verdict">{g.match === false ? '✗' : g.match ? '✓' : 'n/a'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

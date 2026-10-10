@@ -237,7 +237,7 @@ export function tzOffsetNow(tz: string, at = new Date()): number | null {
 const timezoneOffset: Rule = ({ s }) => {
   const f = s.client?.fingerprint;
   if (!f) return null;
-  const expected = tzOffsetNow(f.timezone);
+  const expected = tzOffsetNow(f.timezone, new Date(s.server.receivedAt ?? Date.now()));
   if (expected === null || expected === f.timezoneOffset) return null;
   return { id: 'lie.tz-offset', category: 'consistency', status: 'fail', points: 25, flags: ['tampering'], title: 'Timezone name and clock disagree', detail: `The timezone is ${f.timezone} (UTC offset ${-expected} min) but Date says ${-f.timezoneOffset} min: one of them is spoofed.` };
 };

@@ -103,5 +103,7 @@ export function sanitizeClient(v: unknown): ClientSignals | null {
     },
     behavior: sanitizeBehavior(c.behavior),
     collectMs: int(c.collectMs),
+    clientTime: num(c.clientTime),
+    locale: str(c.locale, 64),
   };
 }

@@ -78,6 +78,23 @@ The HTTPS port is a raw `net.Server`. It buffers the first TLS record(s), parses
 | Robotic mouse path | 25 | > 90% of mouse segments continue in exactly the same direction with the same length: `page.mouse.move(x, y, { steps })` interpolation. |
 | Metronome typing | 25 | Key intervals with < 8 ms standard deviation: `keyboard.type(text, { delay })`. |
 
+### Browser vs IP location (display only)
+
+`packages/scoring/src/geo.ts` puts what the browser says next to where its IP is, row by row, and the page shows mismatches in red. **These rows add no points yet.** The scored overlaps (`net.timezone`, `lie.tz-offset`, `net.webrtc`) stay in the rules above.
+
+The IP's timezone comes from tzdb `zone.tab`. DB-IP Lite has no timezone, so the server takes the zone of the IP country whose reference city is closest to the IP's coordinates. That tells New York from Los Angeles, not only "US".
+
+| Row | Browser | Compared with | Red when | Could it score? |
+|---|---|---|---|---|
+| Timezone | IANA zone | IP zone | another zone with a different time now | covered by `net.timezone` |
+| Local time | clock offset + time | offset + time at the IP | offsets differ | **yes**: hours apart is the clearest VPN sign |
+| Timezone country | country of the zone | IP country | different | already +15 |
+| Clock (UTC) | `Date.now()` at send | server clock | more than 2 min apart | weak: badly set PCs exist; VMs and farms drift too |
+| Language vs country | `navigator.languages` | languages of the IP country | a non-English language set and none fits | no: expats and travellers. English-only fits anywhere |
+| Accept-Language | `navigator.languages` | the HTTP header | primary language differs | **yes**: one browser setting feeds both, so a mismatch is a tool |
+| Intl locale | `Intl` locale | `navigator.language` | primary language differs | maybe: also happens when the UI and content languages differ |
+| WebRTC country | WebRTC IP country | HTTP IP country | different | covered by `net.webrtc` |
+
 ### Fingerprint and rarity
 
 `fingerprintId` hashes the stable components (canvas, WebGL vendor/renderer/params, audio, fonts, screen, CPU/RAM, timezone, languages, platform, math, UA-CH platform/arch/model). If the canvas is randomised (Brave, Firefox RFP), the hash uses "noise" instead, so the ID stays stable. The `components` table stores each component per visit, and the Check page shows how many devices share each value.

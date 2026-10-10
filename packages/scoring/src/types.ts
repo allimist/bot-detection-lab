@@ -88,6 +88,8 @@ export interface ClientSignals {
   webrtc: WebRtcSignals;
   behavior: BehaviorSignals | null;
   collectMs: number;
+  clientTime: number | null; // Date.now() right before sending, compared with the server clock
+  locale: string;            // Intl.DateTimeFormat().resolvedOptions().locale
 }
 
 export interface IpIntel {
@@ -138,6 +140,7 @@ export interface ServerSignals {
   tls: TlsSignals | null;
   velocity: VelocitySignals | null;
   tzCountry: string | null;   // country of the browser's IANA timezone (from tzdb zone.tab)
+  receivedAt?: number;        // server clock when the signals arrived (missing on visits stored before it existed)
 }
 
 export interface Signals {
@@ -161,11 +164,22 @@ export interface Finding {
 
 export type Verdict = 'human' | 'suspicious' | 'bot';
 
+/** One row of the "browser vs IP location" table. Shown only, never scored. */
+export interface GeoCheck {
+  id: 'tz' | 'offset' | 'tz-country' | 'clock' | 'lang-country' | 'accept-language' | 'locale' | 'webrtc-country';
+  label: string;
+  browser: string;
+  location: string;
+  match: boolean | null; // null = cannot compare (no JS, private IP, missing data)
+  note: string;
+}
+
 export interface ScoreResult {
   score: number;       // bot risk 0..100
   verdict: Verdict;
   flags: Flag[];
   findings: Finding[];
+  geo: GeoCheck[];
 }
 
 /** What /api/collect, /api/check/:id and /api/inspect return. */
